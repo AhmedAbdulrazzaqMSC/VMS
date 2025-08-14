@@ -3,24 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Refrigeration Unit Scanner</title>
+    <title>Enhanced Refrigeration Scanner</title>
     <style>
         :root {
-            --valid-color: #34a853;
-            --invalid-color: #e63757;
-            --pending-color: #fbbc05;
-            --scan-box-color: #4285f4;
+            --primary: #4285f4;
+            --success: #34a853;
+            --warning: #fbbc05;
+            --danger: #ea4335;
         }
         body {
             margin: 0;
             padding: 0;
             font-family: Arial, sans-serif;
-            background: #f5f7fa;
+            background: #f8f9fa;
         }
         .scanner-container {
             position: relative;
             width: 100%;
-            height: 70vh; /* Increased height for larger frame */
+            height: 60vh;
             overflow: hidden;
             background: #000;
         }
@@ -34,86 +34,83 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 90%; /* Larger capture area */
-            height: 50%; /* Larger capture area */
-            border: 4px solid var(--scan-box-color);
+            width: 85%;
+            height: 40%;
+            border: 3px solid var(--primary);
             border-radius: 12px;
             background: rgba(66, 133, 244, 0.1);
-            box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.7);
+            box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.6);
             clip-path: inset(0 0 0 0 round 12px);
-            transition: all 0.3s;
         }
-        .scanning-box.valid {
-            border-color: var(--valid-color);
-            background: rgba(52, 168, 83, 0.2);
+        .form-container {
+            padding: 20px;
+            background: white;
+            border-top-left-radius: 20px;
+            border-top-right-radius: 20px;
+            margin-top: -20px;
+            box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
         }
-        .scanning-box.invalid {
-            border-color: var(--invalid-color);
-            background: rgba(230, 55, 87, 0.2);
+        .form-field {
+            margin-bottom: 20px;
+            position: relative;
         }
-        .validation-feedback {
-            position: absolute;
-            bottom: 20px;
-            left: 0;
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #3c4043;
+        }
+        input {
             width: 100%;
-            text-align: center;
-            color: white;
-            font-size: 18px;
-            font-weight: bold;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
-            padding: 10px;
-            background: rgba(0,0,0,0.5);
+            padding: 12px 16px;
+            border: 1px solid #dadce0;
             border-radius: 8px;
-            margin: 0 auto;
-            max-width: 90%;
+            font-size: 16px;
+            box-sizing: border-box;
         }
-        .status-indicator {
-            display: inline-block;
-            width: 15px;
-            height: 15px;
-            border-radius: 50%;
-            margin-right: 10px;
-            background: var(--pending-color);
-            vertical-align: middle;
+        .field-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 8px;
         }
-        .status-indicator.valid {
-            background: var(--valid-color);
-        }
-        .status-indicator.invalid {
-            background: var(--invalid-color);
-        }
-        .real-time-preview {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            right: 20px;
-            background: rgba(0,0,0,0.7);
-            color: white;
-            padding: 12px;
+        .btn {
+            padding: 10px 16px;
+            border: none;
             border-radius: 8px;
             font-size: 14px;
-            max-height: 20%;
-            overflow: auto;
-            z-index: 10;
+            font-weight: 500;
+            cursor: pointer;
+            flex: 1;
         }
-        #capture-btn {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            padding: 18px 36px;
-            background: var(--scan-box-color);
+        .btn-primary {
+            background: var(--primary);
             color: white;
-            border: none;
-            border-radius: 50px;
-            font-size: 18px;
-            font-weight: 600;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-            z-index: 100;
+        }
+        .btn-secondary {
+            background: #f1f3f4;
+            color: #3c4043;
+        }
+        .status-message {
+            margin-top: 8px;
+            font-size: 13px;
+            padding: 6px 10px;
+            border-radius: 4px;
+            display: none;
+        }
+        .status-success {
+            background: rgba(52, 168, 83, 0.1);
+            color: var(--success);
+            display: block;
+        }
+        .status-error {
+            background: rgba(234, 67, 53, 0.1);
+            color: var(--danger);
+            display: block;
         }
         .current-step {
             position: absolute;
-            top: 10px;
+            top: 15px;
             left: 50%;
             transform: translateX(-50%);
             background: rgba(0,0,0,0.7);
@@ -123,71 +120,129 @@
             font-size: 14px;
             z-index: 10;
         }
+        #manual-entry {
+            display: none;
+            padding: 20px;
+            background: white;
+        }
+        .toggle-mode {
+            text-align: center;
+            margin: 15px 0;
+        }
+        .toggle-btn {
+            background: none;
+            border: none;
+            color: var(--primary);
+            text-decoration: underline;
+            font-size: 14px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
     <div class="scanner-container">
         <video id="camera-view" autoplay playsinline></video>
-        <div class="scanning-box" id="scanning-box"></div>
-        <div class="current-step" id="current-step">Scanning: Container ID</div>
-        <div class="real-time-preview" id="real-time-preview">Live preview will appear here...</div>
-        <div class="validation-feedback" id="validation-feedback">
-            <span class="status-indicator"></span>
-            <span id="feedback-text">Align the display within the frame</span>
+        <div class="scanning-box"></div>
+        <div class="current-step" id="current-step">Ready to scan</div>
+    </div>
+
+    <div id="scanner-mode">
+        <div class="form-container">
+            <div class="form-field">
+                <label for="container-id">Container ID</label>
+                <input type="text" id="container-id" placeholder="Scan or enter manually">
+                <div class="field-actions">
+                    <button class="btn btn-primary" id="scan-container-btn">Scan</button>
+                    <button class="btn btn-secondary" id="edit-container-btn">Edit</button>
+                </div>
+                <div class="status-message" id="container-status"></div>
+            </div>
+
+            <div class="form-field">
+                <label for="setpoint">Setpoint (°C)</label>
+                <input type="text" id="setpoint" placeholder="Scan or enter manually">
+                <div class="field-actions">
+                    <button class="btn btn-primary" id="scan-setpoint-btn">Scan</button>
+                    <button class="btn btn-secondary" id="edit-setpoint-btn">Edit</button>
+                </div>
+                <div class="status-message" id="setpoint-status"></div>
+            </div>
+
+            <div class="form-field">
+                <label for="supply-temp">Supply Temp (°C)</label>
+                <input type="text" id="supply-temp" placeholder="Scan or enter manually">
+                <div class="field-actions">
+                    <button class="btn btn-primary" id="scan-supply-btn">Scan</button>
+                    <button class="btn btn-secondary" id="edit-supply-btn">Edit</button>
+                </div>
+                <div class="status-message" id="supply-status"></div>
+            </div>
+
+            <div class="form-field">
+                <label for="return-temp">Return Temp (°C)</label>
+                <input type="text" id="return-temp" placeholder="Scan or enter manually">
+                <div class="field-actions">
+                    <button class="btn btn-primary" id="scan-return-btn">Scan</button>
+                    <button class="btn btn-secondary" id="edit-return-btn">Edit</button>
+                </div>
+                <div class="status-message" id="return-status"></div>
+            </div>
         </div>
     </div>
-    
-    <button id="capture-btn">Capture</button>
+
+    <div id="manual-entry">
+        <div class="form-container">
+            <div class="form-field">
+                <label for="manual-container-id">Container ID</label>
+                <input type="text" id="manual-container-id">
+            </div>
+            <div class="form-field">
+                <label for="manual-setpoint">Setpoint (°C)</label>
+                <input type="text" id="manual-setpoint">
+            </div>
+            <div class="form-field">
+                <label for="manual-supply-temp">Supply Temp (°C)</label>
+                <input type="text" id="manual-supply-temp">
+            </div>
+            <div class="form-field">
+                <label for="manual-return-temp">Return Temp (°C)</label>
+                <input type="text" id="manual-return-temp">
+            </div>
+            <button class="btn btn-primary" id="save-manual-btn">Save Manual Entries</button>
+        </div>
+    </div>
+
+    <div class="toggle-mode">
+        <button class="toggle-btn" id="toggle-mode-btn">Switch to Manual Entry Mode</button>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', async function() {
             // DOM elements
             const video = document.getElementById('camera-view');
-            const scanningBox = document.getElementById('scanning-box');
-            const validationFeedback = document.getElementById('validation-feedback');
-            const feedbackText = document.getElementById('feedback-text');
-            const statusIndicator = document.querySelector('.status-indicator');
-            const realTimePreview = document.getElementById('real-time-preview');
-            const currentStepDisplay = document.getElementById('current-step');
-            const captureBtn = document.getElementById('capture-btn');
+            const currentStep = document.getElementById('current-step');
+            const scannerMode = document.getElementById('scanner-mode');
+            const manualMode = document.getElementById('manual-entry');
+            const toggleBtn = document.getElementById('toggle-mode-btn');
             
-            // Scan configuration
-            const scanSteps = [
-                {
-                    name: "Container ID",
-                    whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
-                    pattern: /([A-Z]{4}\d{7})|(CNTR\W*(\w+))|(UNIT\W*(\w+))/i,
-                    message: (match) => match ? `Container: ${match[0]}` : "No container ID found"
-                },
-                {
-                    name: "Setpoint",
-                    whitelist: '0123456789.°C ',
-                    pattern: /(SET|SETPOINT)[:\s]*([\d.]+)\s*°?C/i,
-                    message: (match) => match ? `Setpoint: ${match[2]}°C` : "No setpoint found"
-                },
-                {
-                    name: "Supply Temp",
-                    whitelist: '0123456789.°C ',
-                    pattern: /(SUP|SUPPLY)[:\s]*([\d.]+)\s*°?C/i,
-                    message: (match) => match ? `Supply: ${match[2]}°C` : "No supply temp found"
-                },
-                {
-                    name: "Return Temp",
-                    whitelist: '0123456789.°C ',
-                    pattern: /(RET|RETURN)[:\s]*([\d.]+)\s*°?C/i,
-                    message: (match) => match ? `Return: ${match[2]}°C` : "No return temp found"
-                }
-            ];
+            // Field elements
+            const containerIdInput = document.getElementById('container-id');
+            const setpointInput = document.getElementById('setpoint');
+            const supplyTempInput = document.getElementById('supply-temp');
+            const returnTempInput = document.getElementById('return-temp');
             
-            let currentStep = 0;
-            let validationInterval;
-            let capturedData = {
-                containerId: null,
-                setpoint: null,
-                supplyTemp: null,
-                returnTemp: null
-            };
+            // Manual entry elements
+            const manualContainerId = document.getElementById('manual-container-id');
+            const manualSetpoint = document.getElementById('manual-setpoint');
+            const manualSupplyTemp = document.getElementById('manual-supply-temp');
+            const manualReturnTemp = document.getElementById('manual-return-temp');
+            
+            // Status elements
+            const containerStatus = document.getElementById('container-status');
+            const setpointStatus = document.getElementById('setpoint-status');
+            const supplyStatus = document.getElementById('supply-status');
+            const returnStatus = document.getElementById('return-status');
             
             // Initialize camera
             async function initCamera() {
@@ -195,198 +250,137 @@
                     const stream = await navigator.mediaDevices.getUserMedia({ 
                         video: { 
                             facingMode: 'environment',
-                            width: { ideal: 1920 },
-                            height: { ideal: 1080 }
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 }
                         } 
                     });
                     video.srcObject = stream;
-                    startRealTimeValidation();
                 } catch (err) {
                     console.error("Camera error:", err);
-                    feedbackText.textContent = "Camera error: Please enable permissions";
-                    statusIndicator.style.backgroundColor = 'var(--invalid-color)';
+                    alert("Camera access required. Please enable permissions.");
                 }
             }
             
-            // Start real-time validation
-            function startRealTimeValidation() {
-                clearInterval(validationInterval);
-                currentStepDisplay.textContent = `Scanning: ${scanSteps[currentStep].name}`;
+            // Perform OCR with better filtering
+            async function performOCR(field) {
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                 
-                validationInterval = setInterval(async () => {
-                    try {
-                        const canvas = document.createElement('canvas');
-                        canvas.width = video.videoWidth;
-                        canvas.height = video.videoHeight;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                        
-                        // Crop to scanning box area (90% width, 50% height)
-                        const boxWidth = canvas.width * 0.9;
-                        const boxHeight = canvas.height * 0.5;
-                        const boxX = (canvas.width - boxWidth) / 2;
-                        const boxY = (canvas.height - boxHeight) / 2;
-                        
-                        const boxCanvas = document.createElement('canvas');
-                        boxCanvas.width = boxWidth;
-                        boxCanvas.height = boxHeight;
-                        const boxCtx = boxCanvas.getContext('2d');
-                        boxCtx.drawImage(
-                            canvas, 
-                            boxX, boxY, boxWidth, boxHeight,
-                            0, 0, boxWidth, boxHeight
-                        );
-                        
-                        // Enhance contrast
-                        const imageData = boxCtx.getImageData(0, 0, boxWidth, boxHeight);
-                        const data = imageData.data;
-                        for (let i = 0; i < data.length; i += 4) {
-                            data[i] = data[i] * 1.2;     // R
-                            data[i + 1] = data[i + 1] * 1.2; // G
-                            data[i + 2] = data[i + 2] * 1.2; // B
-                        }
-                        boxCtx.putImageData(imageData, 0, 0);
-                        
-                        // Perform OCR
-                        const { data: { text } } = await Tesseract.recognize(
-                            boxCanvas.toDataURL('image/jpeg', 0.8),
-                            'eng',
-                            { 
-                                tessedit_char_whitelist: scanSteps[currentStep].whitelist,
-                                preserve_interword_spaces: '1',
-                                tessedit_pageseg_mode: '6'
-                            }
-                        );
-                        
-                        // Validate text
-                        const match = text.match(scanSteps[currentStep].pattern);
-                        const isValid = match !== null;
-                        
-                        // Update UI
-                        scanningBox.classList.remove('valid', 'invalid');
-                        scanningBox.classList.add(isValid ? 'valid' : 'invalid');
-                        statusIndicator.classList.remove('valid', 'invalid');
-                        statusIndicator.classList.add(isValid ? 'valid' : 'invalid');
-                        feedbackText.textContent = scanSteps[currentStep].message(match);
-                        realTimePreview.textContent = `Live Text:\n${text}`;
-                        
-                    } catch (err) {
-                        console.error("Validation error:", err);
-                        realTimePreview.textContent = "Error processing frame";
-                    }
-                }, 1500); // Validate every 1.5 seconds
-            }
-            
-            // Capture current step
-            async function captureStep() {
-                clearInterval(validationInterval);
-                captureBtn.disabled = true;
-                feedbackText.textContent = "Processing...";
-                statusIndicator.style.backgroundColor = 'var(--pending-color)';
+                // Configure based on field type
+                let config = {
+                    preserve_interword_spaces: '1',
+                    tessedit_pageseg_mode: '6'
+                };
+                
+                if (field === 'container-id') {
+                    config.tessedit_char_whitelist = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+                } else {
+                    config.tessedit_char_whitelist = '0123456789.°C';
+                }
+                
+                currentStep.textContent = `Scanning ${field.replace('-', ' ')}...`;
                 
                 try {
-                    const canvas = document.createElement('canvas');
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                    
-                    // Crop to scanning box area
-                    const boxWidth = canvas.width * 0.9;
-                    const boxHeight = canvas.height * 0.5;
-                    const boxX = (canvas.width - boxWidth) / 2;
-                    const boxY = (canvas.height - boxHeight) / 2;
-                    
-                    const boxCanvas = document.createElement('canvas');
-                    boxCanvas.width = boxWidth;
-                    boxCanvas.height = boxHeight;
-                    const boxCtx = boxCanvas.getContext('2d');
-                    boxCtx.drawImage(
-                        canvas, 
-                        boxX, boxY, boxWidth, boxHeight,
-                        0, 0, boxWidth, boxHeight
-                    );
-                    
-                    // Enhance contrast
-                    const imageData = boxCtx.getImageData(0, 0, boxWidth, boxHeight);
-                    const data = imageData.data;
-                    for (let i = 0; i < data.length; i += 4) {
-                        data[i] = data[i] * 1.3;     // R
-                        data[i + 1] = data[i + 1] * 1.3; // G
-                        data[i + 2] = data[i + 2] * 1.3; // B
-                    }
-                    boxCtx.putImageData(imageData, 0, 0);
-                    
-                    // Perform OCR
                     const { data: { text } } = await Tesseract.recognize(
-                        boxCanvas.toDataURL('image/jpeg'),
+                        canvas.toDataURL('image/jpeg', 0.8),
                         'eng',
-                        { 
-                            tessedit_char_whitelist: scanSteps[currentStep].whitelist,
-                            preserve_interword_spaces: '1',
-                            tessedit_pageseg_mode: '6'
-                        }
+                        config
                     );
                     
-                    // Validate and store
-                    const match = text.match(scanSteps[currentStep].pattern);
-                    if (match) {
-                        switch(currentStep) {
-                            case 0: capturedData.containerId = match[1] || match[3] || match[5]; break;
-                            case 1: capturedData.setpoint = match[2]; break;
-                            case 2: capturedData.supplyTemp = match[2]; break;
-                            case 3: capturedData.returnTemp = match[2]; break;
-                        }
-                        
-                        // Move to next step or complete
-                        if (currentStep < scanSteps.length - 1) {
-                            currentStep++;
-                            startRealTimeValidation();
-                        } else {
-                            completeScan();
-                        }
+                    // Filter out garbage text
+                    let filteredText = text.replace(/[^\w\d°C.\s]/g, '');
+                    filteredText = filteredText.replace(/\s+/g, ' ').trim();
+                    
+                    // Extract relevant data
+                    let result = '';
+                    if (field === 'container-id') {
+                        const match = filteredText.match(/([A-Z]{4}\d{7})|(CNTR\W*(\w+))|(UNIT\W*(\w+))/i);
+                        result = match ? (match[1] || match[3] || match[5]) : '';
                     } else {
-                        feedbackText.textContent = "Capture failed. Please try again.";
-                        statusIndicator.style.backgroundColor = 'var(--invalid-color)';
+                        const match = filteredText.match(/([\d.]+)\s*°?C/i);
+                        result = match ? match[1] : '';
                     }
+                    
+                    return {
+                        success: !!result,
+                        value: result,
+                        rawText: filteredText
+                    };
+                    
                 } catch (err) {
-                    console.error("Capture error:", err);
-                    feedbackText.textContent = "Error capturing data";
-                    statusIndicator.style.backgroundColor = 'var(--invalid-color)';
-                } finally {
-                    captureBtn.disabled = false;
+                    console.error("OCR error:", err);
+                    return {
+                        success: false,
+                        value: '',
+                        rawText: ''
+                    };
                 }
             }
             
-            function completeScan() {
-                feedbackText.textContent = "Scan complete! Data captured:";
-                statusIndicator.style.backgroundColor = 'var(--valid-color)';
-                realTimePreview.innerHTML = `
-                    <strong>Container ID:</strong> ${capturedData.containerId}<br>
-                    <strong>Setpoint:</strong> ${capturedData.setpoint}°C<br>
-                    <strong>Supply Temp:</strong> ${capturedData.supplyTemp}°C<br>
-                    <strong>Return Temp:</strong> ${capturedData.returnTemp}°C
-                `;
-                captureBtn.textContent = "Restart Scan";
-                currentStep = 0;
+            // Update field with scanned data
+            async function updateField(field) {
+                const inputElement = document.getElementById(field);
+                const statusElement = document.getElementById(`${field}-status`);
+                
+                const result = await performOCR(field);
+                
+                if (result.success) {
+                    inputElement.value = result.value;
+                    statusElement.textContent = `Successfully scanned: ${result.value}`;
+                    statusElement.className = 'status-message status-success';
+                } else {
+                    statusElement.textContent = `Scan failed. Raw text: ${result.rawText || 'No text detected'}`;
+                    statusElement.className = 'status-message status-error';
+                }
+                
+                currentStep.textContent = 'Ready to scan';
+            }
+            
+            // Toggle between scanner and manual mode
+            function toggleMode() {
+                if (scannerMode.style.display === 'none') {
+                    scannerMode.style.display = 'block';
+                    manualMode.style.display = 'none';
+                    toggleBtn.textContent = 'Switch to Manual Entry Mode';
+                } else {
+                    // Copy current values to manual form
+                    manualContainerId.value = containerIdInput.value;
+                    manualSetpoint.value = setpointInput.value;
+                    manualSupplyTemp.value = supplyTempInput.value;
+                    manualReturnTemp.value = returnTempInput.value;
+                    
+                    scannerMode.style.display = 'none';
+                    manualMode.style.display = 'block';
+                    toggleBtn.textContent = 'Switch to Scanner Mode';
+                }
+            }
+            
+            // Save manual entries
+            function saveManualEntries() {
+                containerIdInput.value = manualContainerId.value;
+                setpointInput.value = manualSetpoint.value;
+                supplyTempInput.value = manualSupplyTemp.value;
+                returnTempInput.value = manualReturnTemp.value;
+                
+                toggleMode();
             }
             
             // Event listeners
-            captureBtn.addEventListener('click', () => {
-                if (currentStep === scanSteps.length - 1 && capturedData.returnTemp) {
-                    // Restart scan if complete
-                    capturedData = {
-                        containerId: null,
-                        setpoint: null,
-                        supplyTemp: null,
-                        returnTemp: null
-                    };
-                    captureBtn.textContent = "Capture";
-                    startRealTimeValidation();
-                } else {
-                    captureStep();
-                }
-            });
+            document.getElementById('scan-container-btn').addEventListener('click', () => updateField('container-id'));
+            document.getElementById('scan-setpoint-btn').addEventListener('click', () => updateField('setpoint'));
+            document.getElementById('scan-supply-btn').addEventListener('click', () => updateField('supply-temp'));
+            document.getElementById('scan-return-btn').addEventListener('click', () => updateField('return-temp'));
+            
+            document.getElementById('edit-container-btn').addEventListener('click', toggleMode);
+            document.getElementById('edit-setpoint-btn').addEventListener('click', toggleMode);
+            document.getElementById('edit-supply-btn').addEventListener('click', toggleMode);
+            document.getElementById('edit-return-btn').addEventListener('click', toggleMode);
+            
+            toggleBtn.addEventListener('click', toggleMode);
+            document.getElementById('save-manual-btn').addEventListener('click', saveManualEntries);
             
             // Initialize
             initCamera();
