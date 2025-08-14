@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Auto-Scan Refrigeration Unit</title>
+    <style>
+        /* Previous styles remain the same */
+        .scanning-guidance {
+            position: absolute;
+            bottom: 80px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            color: white;
+            font-size: 14px;
+            padding: 8px;
+            background: rgba(0,0,0,0.5);
+        }
+        .auto-capture-status {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            display: none;
+        }
+        .confidence-meter {
+            height: 4px;
+            background: #333;
+            margin-top: 8px;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .confidence-level {
+            height: 100%;
+            background: var(--primary);
+            width: 0%;
+            transition: width 0.3s;
+        }
+    </style>
+</head>
+<body>
+    <!-- Previous HTML remains the same until the script section -->
+    
+    <div class="auto-capture-status">
+        <div>Aligning with display...</div>
+        <div class="confidence-meter">
+            <div class="confidence-level" id="confidence-level"></div>
+        </div>
+    </div>
+    <div class="scanning-guidance" id="scanning-guidance">
+        Position the camera so the display fits within the outlined area
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+    <script>
+        // Previous variable declarations remain the same
+        const autoCaptureStatus = document.querySelector('.auto-capture-status');
+        const confidenceLevel = document.getElementById('confidence-level');
+        const scanningGuidance = document.getElementById('scanning-guidance');
+        
+        // Auto-capture variables
+        let autoCaptureTimeout;
+        let isAutoCapturing = false;
+        let lastCaptureTime = 0;
+        const MIN_CAPTURE_INTERVAL = 3000; // 3 seconds between auto-captures
+        
+        // Initialize camera (previous implementation)
+        
+        // Enhanced frame analysis with auto-capture
+        async function analyzeFrame() {
+            if (!video.videoWidth || isAutoCapturing) {
+                requestAnimationFrame(analyzeFrame);
+                return;
+            }
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // 1. Detect display area
+            const displayArea = detectDisplayArea(canvas);
+            
+            // 2. Analyze content if display is detected
+            if (displayArea) {
+                const displayCanvas = cropToDisplay(canvas, displayArea);
+                const contentValid = await validateDisplayContent(displayCanvas);
+                
+                // Update UI
+                confidenceLevel.style.width = `${contentValid.confidence}%`;
+                
+                if (contentValid.isValid && 
+                    contentValid.confidence > 75 && 
+                    Date.now() - lastCaptureTime > MIN_CAPTURE_INTERVAL) {
+                    
+                    autoCaptureStatus.innerHTML = '<div>Display detected! Capturing...</div>';
+                    scanningGuidance.style.display = 'none';
+                    
+                    // Proceed with auto-capture
+                    await processCapturedImage(displayCanvas);
+                    lastCaptureTime = Date.now();
+                } else {
+                    autoCaptureStatus.style.display = 'block';
+                    scanningGuidance.style.display = 'block';
+                }
+            } else {
+                autoCaptureStatus.style.display = 'none';
+                confidenceLevel.style.width = '0%';
+                scanningGuidance.style.display = 'block';
+            }
+            
+            requestAnimationFrame(analyzeFrame);
+        }
+        
+        // Detect the display area in the image
+        function detectDisplayArea(canvas) {
+            const ctx = canvas.getContext('2d');
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            
+            // Simple edge detection (replace with more sophisticated algorithm if needed)
+            const edges = detectEdges(imageData);
+            
+            // Find largest rectangle that could be the display
+            const displayRect = findLargestRectangle(edges);
+            
+            return displayRect ? {
+                x: displayRect.x,
+                y: displayRect.y,
+                width: displayRect.width,
+                height: displayRect.height
+            } : null;
+        }
+        
+        // Basic edge detection (simplified)
+        function detectEdges(imageData) {
+            // Implement edge detection logic here
+            // This is a placeholder - in production you might use:
+            // - Canvas filters
+            // - A JS image processing library
+            // - Or more sophisticated computer vision
+            return [];
+        }
+        
+        // Find largest rectangle in edges (simplified)
+        function findLargestRectangle(edges) {
+            // Implement rectangle finding logic
+            // Return null if no good candidate found
+            return null; // Placeholder
+        }
+        
+        // Crop to display area
+        function cropToDisplay(sourceCanvas, displayArea) {
+            const canvas = document.createElement('canvas');
+            canvas.width = displayArea.width;
+            canvas.height = displayArea.height;
+            const ctx = canvas.getContext('2d');
+            
+            ctx.drawImage(sourceCanvas, 
+                displayArea.x, displayArea.y, 
+                displayArea.width, displayArea.height,
+                0, 0, 
+                displayArea.width, displayArea.height);
+            
+            return canvas;
+        }
+        
+        // Validate display content
+        async function validateDisplayContent(canvas) {
+            // Preprocess for better OCR
+            preprocessDisplayImage(canvas);
+            
+            // Get text from display area
+            const { data: { text } } = await Tesseract.recognize(
+                canvas.toDataURL('image/jpeg'),
+                'eng',
+                {
+                    tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:.°C ',
+                    preserve_interword_spaces: '1'
+                }
+            );
+            
+            // Check for required content patterns
+            const hasContainerId = /(CNTR|UNIT|ID)/i.test(text);
+            const hasTemperatures = /(SET|SUP|RET|TEMP)/i.test(text);
+            const lineCount = text.split('\n').filter(line => line.trim().length > 0).length;
+            
+            // Calculate confidence score (0-100)
+            const confidence = Math.min(100, 
+                (hasContainerId ? 30 : 0) + 
+                (hasTemperatures ? 40 : 0) + 
+                (lineCount >= 3 ? 30 : 0));
+            
+            return {
+                isValid: hasContainerId && hasTemperatures,
+                confidence: confidence,
+                text: text
+            };
+        }
+        
+        // Image preprocessing for better OCR
+        function preprocessDisplayImage(canvas) {
+            const ctx = canvas.getContext('2d');
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            
+            // Simple contrast enhancement
+            const data = imageData.data;
+            const contrast = 1.5; // Adjust based on your displays
+            
+            for (let i = 0; i < data.length; i += 4) {
+                data[i] = 128 + (data[i] - 128) * contrast;     // R
+                data[i + 1] = 128 + (data[i + 1] - 128) * contrast; // G
+                data[i + 2] = 128 + (data[i + 2] - 128) * contrast; // B
+            }
+            
+            ctx.putImageData(imageData, 0, 0);
+        }
+        
+        // Process captured image (extract data)
+        async function processCapturedImage(canvas) {
+            isAutoCapturing = true;
+            autoCaptureStatus.style.display = 'block';
+            
+            try {
+                const { isValid, confidence, text } = await validateDisplayContent(canvas);
+                
+                if (isValid && confidence > 70) {
+                    // Extract and populate data (same as before)
+                    const containerMatch = text.match(/([A-Z]{4}\d{7})|(CNTR\W*(\w+))|(UNIT\W*(\w+))/i);
+                    if (containerMatch) containerIdInput.value = containerMatch[1] || containerMatch[3] || containerMatch[5];
+                    
+                    const setpointMatch = text.match(/(SET|SETPOINT)[:\s]*([\d.]+)\s*°?C/i);
+                    if (setpointMatch) setpointInput.value = setpointMatch[2];
+                    
+                    const supplyMatch = text.match(/(SUP|SUPPLY)[:\s]*([\d.]+)\s*°?C/i);
+                    if (supplyMatch) supplyTempInput.value = supplyMatch[2];
+                    
+                    const returnMatch = text.match(/(RET|RETURN)[:\s]*([\d.]+)\s*°?C/i);
+                    if (returnMatch) returnTempInput.value = returnMatch[2];
+                    
+                    // Show success feedback
+                    autoCaptureStatus.innerHTML = '<div style="color:#2ecc71;">Data captured successfully!</div>';
+                    setTimeout(() => autoCaptureStatus.style.display = 'none', 2000);
+                } else {
+                    autoCaptureStatus.innerHTML = '<div>Low confidence in scan. Please try again.</div>';
+                }
+            } catch (err) {
+                console.error("Auto-capture error:", err);
+                autoCaptureStatus.innerHTML = '<div>Error processing display. Please try again.</div>';
+            } finally {
+                setTimeout(() => {
+                    isAutoCapturing = false;
+                }, 1000);
+            }
+        }
+        
+        // Initialize with auto-capture
+        async function initCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        facingMode: 'environment',
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    } 
+                });
+                video.srcObject = stream;
+                video.onloadedmetadata = () => {
+                    video.play();
+                    // Start auto-capture analysis
+                    analyzeFrame();
+                    // Continue LED detection
+                    analyzeFrameForLEDs();
+                };
+            } catch (err) {
+                console.error("Camera error:", err);
+                alert("Camera access required. Please enable camera permissions.");
+            }
+        }
+        
+        // Manual capture fallback
+        captureBtn.addEventListener('click', async () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            await processCapturedImage(canvas);
+        });
+        
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', initCamera);
+    </script>
+</body>
+</html>
