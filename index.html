@@ -3,167 +3,437 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Refrigeration Temp Scanner</title>
+    <title>Step-by-Step Unit Scanner</title>
     <style>
-        body { 
-            margin: 0; 
-            padding: 0; 
+        body {
+            margin: 0;
+            padding: 0;
             font-family: Arial, sans-serif;
+            background: #f5f7fa;
         }
-        #camera-view { 
-            width: 100%; 
-            display: block;
+        .scanner-container {
+            position: relative;
+            width: 100%;
+            height: 60vh;
+            overflow: hidden;
+            background: #000;
+        }
+        #camera-view {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .scanning-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 70%;
+            height: 30%;
+            border: 3px solid #4285f4;
+            border-radius: 8px;
+            background: rgba(66, 133, 244, 0.1);
         }
         #capture-btn {
             position: fixed;
             bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
-            padding: 15px 30px;
-            background: #2c7be5;
+            padding: 16px 32px;
+            background: #4285f4;
             color: white;
             border: none;
             border-radius: 50px;
-            font-size: 18px;
-            z-index: 100;
+            font-size: 16px;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 10;
         }
-        .scanning-box {
+        .form-container {
+            padding: 20px;
+            background: white;
+            border-top-left-radius: 20px;
+            border-top-right-radius: 20px;
+            margin-top: -20px;
+            box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
+        }
+        .step-indicator {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .step {
+            text-align: center;
+            flex: 1;
+            padding: 8px;
+            font-size: 14px;
+            color: #9aa0a6;
+            position: relative;
+        }
+        .step.active {
+            color: #4285f4;
+            font-weight: 600;
+        }
+        .step.completed {
+            color: #34a853;
+        }
+        .step::after {
+            content: '';
             position: absolute;
             top: 50%;
-            right: 10%;  /* Focus on right side where temps usually are */
-            width: 30%;  /* Narrower box for just temperature area */
-            height: 40%;
-            border: 3px solid #2c7be5;
-            border-radius: 8px;
-            background: rgba(44, 123, 229, 0.1);
+            left: 50%;
+            width: 8px;
+            height: 8px;
+            background: #dadce0;
+            border-radius: 50%;
+            transform: translate(-50%, 10px);
         }
-        #results {
-            position: fixed;
-            bottom: 100px;
-            left: 0;
-            width: 100%;
-            background: rgba(0,0,0,0.7);
-            color: white;
-            padding: 15px;
-            box-sizing: border-box;
-            font-size: 16px;
+        .step.active::after, .step.completed::after {
+            background: currentColor;
+        }
+        .step-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #202124;
             text-align: center;
         }
-        .temp-value {
-            font-size: 24px;
-            font-weight: bold;
-            margin: 10px 0;
+        .step-instruction {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #5f6368;
+        }
+        .form-field {
+            margin-bottom: 16px;
+        }
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #dadce0;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        .led-status {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px 0;
+        }
+        .led-indicator {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .led-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            margin-bottom: 8px;
+            border: 2px solid #eee;
+        }
+        .alarm-led {
+            background: #e63757;
+        }
+        .defrost-led {
+            background: #f6c343;
+        }
+        .loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            display: none;
+            z-index: 100;
+        }
+        .navigation {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+        .nav-btn {
+            padding: 12px 24px;
+            background: #f1f3f4;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .nav-btn.primary {
+            background: #4285f4;
+            color: white;
         }
     </style>
 </head>
 <body>
-    <div style="position: relative;">
+    <div class="scanner-container">
         <video id="camera-view" autoplay playsinline></video>
         <div class="scanning-box"></div>
-        <div id="results">
-            <div>Point camera at temperature display</div>
-            <div class="temp-value" id="current-temp">--.-°C</div>
-        </div>
     </div>
     
-    <button id="capture-btn">Scan Temperature</button>
+    <div class="loading" id="loading">Processing...</div>
+    
+    <div class="form-container">
+        <div class="step-indicator">
+            <div class="step active" id="step1-indicator">1. Container</div>
+            <div class="step" id="step2-indicator">2. Setpoint</div>
+            <div class="step" id="step3-indicator">3. Supply</div>
+            <div class="step" id="step4-indicator">4. Return</div>
+            <div class="step" id="step5-indicator">5. LEDs</div>
+        </div>
+        
+        <div id="step1">
+            <div class="step-title">Scan Container ID</div>
+            <div class="step-instruction">Position the container ID within the frame</div>
+            <div class="form-field">
+                <label for="container-id">Container ID</label>
+                <input type="text" id="container-id" placeholder="Will be scanned">
+            </div>
+        </div>
+        
+        <div id="step2" style="display: none;">
+            <div class="step-title">Scan Setpoint</div>
+            <div class="step-instruction">Position the setpoint temperature within the frame</div>
+            <div class="form-field">
+                <label for="setpoint">Setpoint (°C)</label>
+                <input type="text" id="setpoint" placeholder="Will be scanned">
+            </div>
+        </div>
+        
+        <div id="step3" style="display: none;">
+            <div class="step-title">Scan Supply Temp</div>
+            <div class="step-instruction">Position the supply temperature within the frame</div>
+            <div class="form-field">
+                <label for="supply-temp">Supply Temp (°C)</label>
+                <input type="text" id="supply-temp" placeholder="Will be scanned">
+            </div>
+        </div>
+        
+        <div id="step4" style="display: none;">
+            <div class="step-title">Scan Return Temp</div>
+            <div class="step-instruction">Position the return temperature within the frame</div>
+            <div class="form-field">
+                <label for="return-temp">Return Temp (°C)</label>
+                <input type="text" id="return-temp" placeholder="Will be scanned">
+            </div>
+        </div>
+        
+        <div id="step5" style="display: none;">
+            <div class="step-title">Check LED Status</div>
+            <div class="step-instruction">Position the LED indicators within the frame</div>
+            <div class="led-status">
+                <div class="led-indicator">
+                    <div class="led-icon alarm-led" id="alarm-led-icon"></div>
+                    <div>Alarm</div>
+                </div>
+                <div class="led-indicator">
+                    <div class="led-icon defrost-led" id="defrost-led-icon"></div>
+                    <div>Defrost</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="navigation">
+            <button class="nav-btn" id="prev-btn" disabled>Previous</button>
+            <button class="nav-btn primary" id="next-btn">Capture & Continue</button>
+        </div>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
-    
     <script>
         document.addEventListener('DOMContentLoaded', async function() {
+            // DOM elements
             const video = document.getElementById('camera-view');
-            const captureBtn = document.getElementById('capture-btn');
-            const currentTempDisplay = document.getElementById('current-temp');
+            const loadingDiv = document.getElementById('loading');
+            const containerIdInput = document.getElementById('container-id');
+            const setpointInput = document.getElementById('setpoint');
+            const supplyTempInput = document.getElementById('supply-temp');
+            const returnTempInput = document.getElementById('return-temp');
+            const alarmLedIcon = document.getElementById('alarm-led-icon');
+            const defrostLedIcon = document.getElementById('defrost-led-icon');
+            const prevBtn = document.getElementById('prev-btn');
+            const nextBtn = document.getElementById('next-btn');
             
-            // Access camera
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { 
-                        facingMode: 'environment',
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
-                    } 
-                });
-                video.srcObject = stream;
-            } catch (err) {
-                console.error("Camera error:", err);
-                currentTempDisplay.textContent = "Camera error";
+            // Step management
+            const steps = [
+                { id: 'step1', indicator: 'step1-indicator', field: 'container-id' },
+                { id: 'step2', indicator: 'step2-indicator', field: 'setpoint' },
+                { id: 'step3', indicator: 'step3-indicator', field: 'supply-temp' },
+                { id: 'step4', indicator: 'step4-indicator', field: 'return-temp' },
+                { id: 'step5', indicator: 'step5-indicator', field: 'leds' }
+            ];
+            let currentStep = 0;
+            
+            // Initialize camera
+            async function initCamera() {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { 
+                            facingMode: 'environment',
+                            width: { ideal: 1920 },
+                            height: { ideal: 1080 }
+                        } 
+                    });
+                    video.srcObject = stream;
+                    
+                    // Start LED detection for step 5
+                    detectLeds();
+                } catch (err) {
+                    console.error("Camera error:", err);
+                    alert("Could not access camera. Please enable permissions.");
+                }
             }
             
-            // Capture button handler
-            captureBtn.addEventListener('click', async () => {
-                captureBtn.disabled = true;
-                currentTempDisplay.textContent = "Scanning...";
+            // LED detection (for step 5)
+            async function detectLeds() {
+                if (currentStep !== 4) {
+                    requestAnimationFrame(detectLeds);
+                    return;
+                }
+                
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                // Sample areas where LEDs typically appear
+                const alarmLedArea = ctx.getImageData(50, 50, 30, 30); // Top-left area
+                const defrostLedArea = ctx.getImageData(canvas.width - 80, 50, 30, 30); // Top-right
+                
+                // Check for red pixels (alarm)
+                const alarmActive = detectColoredPixels(alarmLedArea, 200, 0, 0);
+                // Check for amber/yellow pixels (defrost)
+                const defrostActive = detectColoredPixels(defrostLedArea, 200, 150, 0);
+                
+                // Update UI
+                alarmLedIcon.style.borderColor = alarmActive ? '#e63757' : '#eee';
+                defrostLedIcon.style.borderColor = defrostActive ? '#f6c343' : '#eee';
+                
+                requestAnimationFrame(detectLeds);
+            }
+            
+            function detectColoredPixels(imageData, r, g, b) {
+                const data = imageData.data;
+                const threshold = 50;
+                let coloredPixels = 0;
+                
+                for (let i = 0; i < data.length; i += 4) {
+                    const pixelR = data[i];
+                    const pixelG = data[i + 1];
+                    const pixelB = data[i + 2];
+                    
+                    const distance = Math.sqrt(
+                        Math.pow(pixelR - r, 2) +
+                        Math.pow(pixelG - g, 2) +
+                        Math.pow(pixelB - b, 2)
+                    );
+                    
+                    if (distance < threshold) coloredPixels++;
+                }
+                
+                return coloredPixels > (imageData.width * imageData.height * 0.1);
+            }
+            
+            // Process current step
+            async function processStep() {
+                loadingDiv.style.display = 'block';
+                nextBtn.disabled = true;
                 
                 try {
-                    // Create canvas from video frame (focus on right side)
                     const canvas = document.createElement('canvas');
                     canvas.width = video.videoWidth;
                     canvas.height = video.videoHeight;
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                     
-                    // Crop to right side where temperature is usually displayed
-                    const rightSideWidth = canvas.width * 0.3;
-                    const rightSideCanvas = document.createElement('canvas');
-                    rightSideCanvas.width = rightSideWidth;
-                    rightSideCanvas.height = canvas.height;
-                    const rightSideCtx = rightSideCanvas.getContext('2d');
-                    rightSideCtx.drawImage(
-                        canvas, 
-                        canvas.width - rightSideWidth, 0, rightSideWidth, canvas.height,
-                        0, 0, rightSideWidth, canvas.height
-                    );
-                    
-                    // Enhance contrast for better OCR
-                    const imageData = rightSideCtx.getImageData(0, 0, rightSideCanvas.width, rightSideCanvas.height);
-                    const data = imageData.data;
-                    for (let i = 0; i < data.length; i += 4) {
-                        // Simple contrast enhancement
-                        data[i] = data[i] * 1.5;     // R
-                        data[i + 1] = data[i + 1] * 1.5; // G
-                        data[i + 2] = data[i + 2] * 1.5; // B
+                    if (currentStep < 4) { // Text capture steps
+                        const { data: { text } } = await Tesseract.recognize(
+                            canvas.toDataURL('image/jpeg'),
+                            'eng',
+                            { 
+                                tessedit_char_whitelist: currentStep === 0 ? 
+                                    'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789' : 
+                                    '0123456789.°C ',
+                                preserve_interword_spaces: '1'
+                            }
+                        );
+                        
+                        console.log(`Step ${currentStep + 1} text:`, text);
+                        
+                        // Process based on current step
+                        switch(currentStep) {
+                            case 0: // Container ID
+                                const containerMatch = text.match(/([A-Z]{4}\d{7})|(CNTR\W*(\w+))|(UNIT\W*(\w+))/i);
+                                if (containerMatch) {
+                                    containerIdInput.value = containerMatch[1] || containerMatch[3] || containerMatch[5];
+                                }
+                                break;
+                            case 1: // Setpoint
+                                const setpointMatch = text.match(/([\d.]+)\s*°?C/i);
+                                if (setpointMatch) setpointInput.value = setpointMatch[1];
+                                break;
+                            case 2: // Supply Temp
+                                const supplyMatch = text.match(/([\d.]+)\s*°?C/i);
+                                if (supplyMatch) supplyTempInput.value = supplyMatch[1];
+                                break;
+                            case 3: // Return Temp
+                                const returnMatch = text.match(/([\d.]+)\s*°?C/i);
+                                if (returnMatch) returnTempInput.value = returnMatch[1];
+                                break;
+                        }
                     }
-                    rightSideCtx.putImageData(imageData, 0, 0);
                     
-                    // Use Tesseract.js for OCR
-                    const { data: { text } } = await Tesseract.recognize(
-                        rightSideCanvas.toDataURL('image/jpeg'),
-                        'eng',
-                        { 
-                            tessedit_char_whitelist: '0123456789.°C ',
-                            preserve_interword_spaces: '1'
-                        }
-                    );
-                    
-                    console.log("Extracted text:", text);
-                    
-                    // Find temperature value (looks for numbers with decimal and °C)
-                    const tempMatch = text.match(/([\d.]+)\s*°?C/i);
-                    if (tempMatch) {
-                        currentTempDisplay.textContent = `${tempMatch[1]}°C`;
+                    // Move to next step
+                    if (currentStep < 4) {
+                        goToStep(currentStep + 1);
                     } else {
-                        // Fallback - find largest number in the right side
-                        const numbers = text.match(/[\d.]+/g) || [];
-                        if (numbers.length > 0) {
-                            // Find the number with most digits (likely the temperature)
-                            const largestNumber = numbers.reduce((a, b) => 
-                                b.length > a.length ? b : a
-                            );
-                            currentTempDisplay.textContent = `${largestNumber}°C`;
-                        } else {
-                            currentTempDisplay.textContent = "No temp found";
-                        }
+                        // Completion
+                        nextBtn.textContent = 'Finish';
+                        alert('All data captured successfully!');
                     }
                     
                 } catch (err) {
-                    console.error("OCR error:", err);
-                    currentTempDisplay.textContent = "Scan failed";
+                    console.error("Processing error:", err);
+                    alert("Error processing image. Please try again.");
                 } finally {
-                    captureBtn.disabled = false;
+                    loadingDiv.style.display = 'none';
+                    nextBtn.disabled = false;
                 }
-            });
+            }
+            
+            // Navigation
+            function goToStep(stepIndex) {
+                // Update UI
+                steps.forEach((step, index) => {
+                    document.getElementById(step.id).style.display = index === stepIndex ? 'block' : 'none';
+                    const indicator = document.getElementById(step.indicator);
+                    indicator.classList.remove('active');
+                    if (index === stepIndex) indicator.classList.add('active');
+                    if (index < stepIndex) indicator.classList.add('completed');
+                });
+                
+                // Update buttons
+                prevBtn.disabled = stepIndex === 0;
+                nextBtn.textContent = stepIndex === 4 ? 'Complete' : 'Capture & Continue';
+                
+                currentStep = stepIndex;
+            }
+            
+            // Event listeners
+            prevBtn.addEventListener('click', () => goToStep(currentStep - 1));
+            nextBtn.addEventListener('click', processStep);
+            
+            // Initialize
+            initCamera();
         });
     </script>
 </body>
