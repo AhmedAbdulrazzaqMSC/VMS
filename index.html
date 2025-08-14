@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Real-Time Refrigeration Scanner</title>
+    <title>Photo Capture Scanner</title>
     <style>
         :root {
             --primary: #4285f4;
             --success: #34a853;
-            --warning: #fbbc05;
             --danger: #ea4335;
         }
         body {
@@ -17,7 +16,7 @@
             font-family: Arial, sans-serif;
             background: #f8f9fa;
         }
-        .scanner-container {
+        .camera-container {
             position: relative;
             width: 100%;
             height: 60vh;
@@ -29,46 +28,31 @@
             height: 100%;
             object-fit: cover;
         }
-        .scanning-box {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 85%;
-            height: 40%;
-            border: 3px solid var(--primary);
-            border-radius: 12px;
-            background: rgba(66, 133, 244, 0.1);
-            box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.6);
-            clip-path: inset(0 0 0 0 round 12px);
-            transition: border-color 0.3s;
-        }
-        .scanning-box.valid {
-            border-color: var(--success);
-        }
-        .scanning-box.invalid {
-            border-color: var(--danger);
-        }
-        .status-display {
-            position: absolute;
-            bottom: 20px;
-            left: 0;
+        #captured-image {
             width: 100%;
-            text-align: center;
-            color: white;
+            display: none;
+        }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
             font-size: 16px;
-            font-weight: bold;
-            text-shadow: 0 1px 3px rgba(0,0,0,0.5);
-            padding: 10px;
-            background: rgba(0,0,0,0.5);
+            font-weight: 500;
+            cursor: pointer;
+            width: 100%;
+            margin: 10px 0;
+        }
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+        .btn-secondary {
+            background: #f1f3f4;
+            color: #3c4043;
         }
         .form-container {
             padding: 20px;
             background: white;
-            border-top-left-radius: 20px;
-            border-top-right-radius: 20px;
-            margin-top: -20px;
-            box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
         }
         .form-field {
             margin-bottom: 20px;
@@ -88,78 +72,62 @@
             font-size: 16px;
             box-sizing: border-box;
         }
-        .btn {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: 500;
-            cursor: pointer;
-            width: 100%;
-            margin-top: 10px;
+        .status-message {
+            margin-top: 8px;
+            font-size: 13px;
+            padding: 6px 10px;
+            border-radius: 4px;
         }
-        .btn-primary {
-            background: var(--primary);
-            color: white;
+        .status-success {
+            background: rgba(52, 168, 83, 0.1);
+            color: var(--success);
         }
-        .btn-secondary {
-            background: #f1f3f4;
-            color: #3c4043;
+        .status-error {
+            background: rgba(234, 67, 53, 0.1);
+            color: var(--danger);
         }
-        .current-step {
-            position: absolute;
-            top: 15px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0,0,0,0.7);
-            color: white;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 14px;
-            z-index: 10;
-        }
-        .ocr-preview {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            background: rgba(0,0,0,0.7);
-            color: white;
-            padding: 10px;
-            border-radius: 8px;
-            font-size: 12px;
-            max-width: 30%;
-            max-height: 20%;
-            overflow: auto;
+        .loading {
+            text-align: center;
+            padding: 20px;
+            display: none;
         }
     </style>
 </head>
 <body>
-    <div class="scanner-container">
+    <div class="camera-container">
         <video id="camera-view" autoplay playsinline></video>
-        <div class="scanning-box" id="scanning-box"></div>
-        <div class="current-step" id="current-step">Ready to scan</div>
-        <div class="ocr-preview" id="ocr-preview">OCR preview will appear here</div>
-        <div class="status-display" id="status-display">Align the container ID in the frame</div>
+        <img id="captured-image" alt="Captured image">
     </div>
 
     <div class="form-container">
+        <button class="btn btn-primary" id="capture-btn">Take Photo</button>
+        <button class="btn btn-secondary" id="retake-btn" style="display:none">Retake Photo</button>
+        
         <div class="form-field">
             <label for="container-id">Container ID</label>
-            <input type="text" id="container-id" placeholder="Will be scanned automatically">
+            <input type="text" id="container-id" placeholder="Will be extracted from photo">
+            <div class="status-message" id="container-status"></div>
         </div>
         <div class="form-field">
             <label for="setpoint">Setpoint (°C)</label>
-            <input type="text" id="setpoint" placeholder="Will be scanned automatically">
+            <input type="text" id="setpoint" placeholder="Will be extracted from photo">
+            <div class="status-message" id="setpoint-status"></div>
         </div>
         <div class="form-field">
             <label for="supply-temp">Supply Temp (°C)</label>
-            <input type="text" id="supply-temp" placeholder="Will be scanned automatically">
+            <input type="text" id="supply-temp" placeholder="Will be extracted from photo">
+            <div class="status-message" id="supply-status"></div>
         </div>
         <div class="form-field">
             <label for="return-temp">Return Temp (°C)</label>
-            <input type="text" id="return-temp" placeholder="Will be scanned automatically">
+            <input type="text" id="return-temp" placeholder="Will be extracted from photo">
+            <div class="status-message" id="return-status"></div>
         </div>
+        
+        <button class="btn btn-primary" id="extract-btn" style="display:none">Extract Data</button>
         <button class="btn btn-secondary" id="manual-btn">Enter Data Manually</button>
+        
+        <div class="loading" id="loading">Processing image...</div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
@@ -167,46 +135,24 @@
         document.addEventListener('DOMContentLoaded', async function() {
             // DOM elements
             const video = document.getElementById('camera-view');
-            const scanningBox = document.getElementById('scanning-box');
-            const currentStep = document.getElementById('current-step');
-            const statusDisplay = document.getElementById('status-display');
-            const ocrPreview = document.getElementById('ocr-preview');
+            const capturedImage = document.getElementById('captured-image');
+            const captureBtn = document.getElementById('capture-btn');
+            const retakeBtn = document.getElementById('retake-btn');
+            const extractBtn = document.getElementById('extract-btn');
+            const manualBtn = document.getElementById('manual-btn');
+            const loadingDiv = document.getElementById('loading');
+            
+            // Field elements
             const containerIdInput = document.getElementById('container-id');
             const setpointInput = document.getElementById('setpoint');
             const supplyTempInput = document.getElementById('supply-temp');
             const returnTempInput = document.getElementById('return-temp');
-            const manualBtn = document.getElementById('manual-btn');
             
-            // Scan state
-            let currentScanStep = 0;
-            let isProcessing = false;
-            let validationInterval;
-            const scanSteps = [
-                {
-                    name: "Container ID",
-                    field: "container-id",
-                    pattern: /([A-Z]{4}\d{7})|(CNTR\W*(\w+))|(UNIT\W*(\w+))/i,
-                    whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-                },
-                {
-                    name: "Setpoint",
-                    field: "setpoint",
-                    pattern: /(SET|SETPOINT)[:\s]*([\d.]+)\s*°?C/i,
-                    whitelist: '0123456789.°C'
-                },
-                {
-                    name: "Supply Temp",
-                    field: "supply-temp",
-                    pattern: /(SUP|SUPPLY)[:\s]*([\d.]+)\s*°?C/i,
-                    whitelist: '0123456789.°C'
-                },
-                {
-                    name: "Return Temp",
-                    field: "return-temp",
-                    pattern: /(RET|RETURN)[:\s]*([\d.]+)\s*°?C/i,
-                    whitelist: '0123456789.°C'
-                }
-            ];
+            // Status elements
+            const containerStatus = document.getElementById('container-status');
+            const setpointStatus = document.getElementById('setpoint-status');
+            const supplyStatus = document.getElementById('supply-status');
+            const returnStatus = document.getElementById('return-status');
             
             // Initialize camera
             async function initCamera() {
@@ -219,86 +165,121 @@
                         } 
                     });
                     video.srcObject = stream;
-                    startRealTimeValidation();
                 } catch (err) {
                     console.error("Camera error:", err);
-                    statusDisplay.textContent = "Camera error: Please enable permissions";
+                    alert("Could not access camera. Please enable permissions.");
                 }
             }
             
-            // Start real-time validation
-            function startRealTimeValidation() {
-                clearInterval(validationInterval);
-                currentScanStep = 0;
-                updateScanStep();
+            // Capture photo
+            captureBtn.addEventListener('click', function() {
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                 
-                validationInterval = setInterval(async () => {
-                    if (isProcessing) return;
-                    
-                    try {
-                        const canvas = document.createElement('canvas');
-                        canvas.width = video.videoWidth;
-                        canvas.height = video.videoHeight;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                        
-                        const currentStepConfig = scanSteps[currentScanStep];
-                        const { data: { text } } = await Tesseract.recognize(
-                            canvas.toDataURL('image/jpeg', 0.8),
-                            'eng',
-                            { 
-                                tessedit_char_whitelist: currentStepConfig.whitelist,
-                                preserve_interword_spaces: '1',
-                                tessedit_pageseg_mode: '6'
-                            }
-                        );
-                        
-                        // Filter out garbage text
-                        const filteredText = text.replace(/[^\w\d°C.\s-]/g, '')
-                                                 .replace(/\s+/g, ' ')
-                                                 .trim();
-                        
-                        ocrPreview.textContent = filteredText || "No text detected";
-                        
-                        // Validate text
-                        const match = filteredText.match(currentStepConfig.pattern);
-                        const isValid = !!match;
-                        
-                        // Update UI
-                        scanningBox.classList.toggle('valid', isValid);
-                        scanningBox.classList.toggle('invalid', !isValid);
-                        
-                        if (isValid) {
-                            const value = match[1] || match[2] || match[3];
-                            document.getElementById(currentStepConfig.field).value = value;
-                            statusDisplay.textContent = `Detected ${currentStepConfig.name}: ${value}`;
-                            
-                            // Auto-advance to next step after short delay
-                            setTimeout(() => {
-                                if (currentScanStep < scanSteps.length - 1) {
-                                    currentScanStep++;
-                                    updateScanStep();
-                                }
-                            }, 1500);
-                        } else {
-                            statusDisplay.textContent = `Align ${currentStepConfig.name} in frame`;
-                        }
-                        
-                    } catch (err) {
-                        console.error("Validation error:", err);
-                        scanningBox.classList.remove('valid', 'invalid');
-                        statusDisplay.textContent = "Error processing image";
-                    }
-                }, 1000); // Validate every second
-            }
+                // Display captured image
+                capturedImage.src = canvas.toDataURL('image/jpeg');
+                capturedImage.style.display = 'block';
+                video.style.display = 'none';
+                
+                // Update UI
+                captureBtn.style.display = 'none';
+                retakeBtn.style.display = 'block';
+                extractBtn.style.display = 'block';
+            });
             
-            // Update current scan step
-            function updateScanStep() {
-                const step = scanSteps[currentScanStep];
-                currentStep.textContent = `Scanning: ${step.name}`;
-                statusDisplay.textContent = `Align ${step.name} in frame`;
-                scanningBox.classList.remove('valid', 'invalid');
-            }
+            // Retake photo
+            retakeBtn.addEventListener('click', function() {
+                capturedImage.style.display = 'none';
+                video.style.display = 'block';
+                captureBtn.style.display = 'block';
+                retakeBtn.style.display = 'none';
+                extractBtn.style.display = 'none';
+                
+                // Clear previous results
+                containerIdInput.value = '';
+                setpointInput.value = '';
+                supplyTempInput.value = '';
+                returnTempInput.value = '';
+                
+                containerStatus.textContent = '';
+                setpointStatus.textContent = '';
+                supplyStatus.textContent = '';
+                returnStatus.textContent = '';
+            });
+            
+            // Extract data from photo
+            extractBtn.addEventListener('click', async function() {
+                loadingDiv.style.display = 'block';
+                extractBtn.disabled = true;
+                
+                try {
+                    // Perform OCR on captured image
+                    const { data: { text } } = await Tesseract.recognize(
+                        capturedImage.src,
+                        'eng',
+                        { 
+                            preserve_interword_spaces: '1',
+                            tessedit_pageseg_mode: '6'
+                        }
+                    );
+                    
+                    console.log("Extracted text:", text);
+                    
+                    // Extract Container ID
+                    const containerMatch = text.match(/([A-Z]{4}\d{7})|(CNTR\W*(\w+))|(UNIT\W*(\w+))/i);
+                    if (containerMatch) {
+                        containerIdInput.value = containerMatch[1] || containerMatch[3] || containerMatch[5];
+                        containerStatus.textContent = "Container ID extracted successfully";
+                        containerStatus.className = "status-message status-success";
+                    } else {
+                        containerStatus.textContent = "No container ID found in photo";
+                        containerStatus.className = "status-message status-error";
+                    }
+                    
+                    // Extract Setpoint
+                    const setpointMatch = text.match(/(SET|SETPOINT)[:\s]*([\d.]+)\s*°?C/i);
+                    if (setpointMatch) {
+                        setpointInput.value = setpointMatch[2];
+                        setpointStatus.textContent = "Setpoint extracted successfully";
+                        setpointStatus.className = "status-message status-success";
+                    } else {
+                        setpointStatus.textContent = "No setpoint found in photo";
+                        setpointStatus.className = "status-message status-error";
+                    }
+                    
+                    // Extract Supply Temp
+                    const supplyMatch = text.match(/(SUP|SUPPLY)[:\s]*([\d.]+)\s*°?C/i);
+                    if (supplyMatch) {
+                        supplyTempInput.value = supplyMatch[2];
+                        supplyStatus.textContent = "Supply temp extracted successfully";
+                        supplyStatus.className = "status-message status-success";
+                    } else {
+                        supplyStatus.textContent = "No supply temp found in photo";
+                        supplyStatus.className = "status-message status-error";
+                    }
+                    
+                    // Extract Return Temp
+                    const returnMatch = text.match(/(RET|RETURN)[:\s]*([\d.]+)\s*°?C/i);
+                    if (returnMatch) {
+                        returnTempInput.value = returnMatch[2];
+                        returnStatus.textContent = "Return temp extracted successfully";
+                        returnStatus.className = "status-message status-success";
+                    } else {
+                        returnStatus.textContent = "No return temp found in photo";
+                        returnStatus.className = "status-message status-error";
+                    }
+                    
+                } catch (err) {
+                    console.error("Extraction error:", err);
+                    alert("Error extracting data from photo. Please try again.");
+                } finally {
+                    loadingDiv.style.display = 'none';
+                    extractBtn.disabled = false;
+                }
+            });
             
             // Manual entry
             manualBtn.addEventListener('click', function() {
